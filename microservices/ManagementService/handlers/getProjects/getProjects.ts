@@ -1,5 +1,5 @@
 import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda';
-import { ListTablesCommand, DynamoDBClient, UpdateItemInput, PutItemInput } from "@aws-sdk/client-dynamodb";
+import { ListTablesCommand, DynamoDBClient, UpdateItemInput, PutItemInput, QueryInput } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocument, DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { NewProjectInput } from '../../model/NewProjectInput';
 
@@ -12,38 +12,29 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
 
     try{
 
-        if(!event?.body){
+        if(!event.pathParameters || !event.pathParameters['project']){
             return {
                 statusCode: 400,
                 body: JSON.stringify({
-                    success: false, err: 'Missing body'
+                    success: false, err: 'missing project'
                 }),
-            };
+            }
         }
-
-        const body = JSON.parse(event.body) as NewProjectInput;
-
-
-
-        const projectID: string = crypto.randomUUID();
-
-        const putParams = {
+        
+        const queryParams = {
             TableName: PROJECTS_TABLE,
-            Item: {
-                'id': projectID,
-                'name': body.name,
-                'users': [],
+            KeyConditionExpression: 'project = :project',
+            ExpressionAttributeValues:{
+                ':project': event!.pathParameters!['project']
             }
         }
 
+        const result = await getAllItems(queryParams);
 
-        await db.put(putParams);
-
-  
         return {
             statusCode: 200,
             body: JSON.stringify({
-                success: true, data: projectID, message: 'Project created'
+                success: true, data: result, message: 'Project created'
             }),
         };
 
@@ -57,3 +48,17 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
     }
   
 };
+
+async function getAllItems(params: any){
+    let accumulated: any[] = [];
+    let LastEvaluatedKey;
+    do{
+
+        const result = await db.query(params);
+
+        LastEvaluatedKey = result.LastEvaluatedKey
+        accumulated = [...accumulated, ...(result.Items ?? [])]
+    }while(LastEvaluatedKey)
+
+    return accumulated;
+}

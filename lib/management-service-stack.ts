@@ -17,7 +17,7 @@ export interface ManagementProps extends cdk.StackProps{
 
 
 export class ManagementServiceStack extends cdk.Stack {
-  public readonly MANAGEMENT_SERVICE_DIR = join(__dirname, 'microservices', 'ManagementService')
+  public readonly MANAGEMENT_SERVICE_DIR = join('microservices', 'ManagementService')
   constructor(scope: Construct, id: string, props: ManagementProps) {
     super(scope, id, props);
 
@@ -27,19 +27,31 @@ export class ManagementServiceStack extends cdk.Stack {
       runtime: Runtime.NODEJS_18_X,
       code: Code.fromAsset(join(this.MANAGEMENT_SERVICE_DIR, 'handlers/createProject')),
       handler: 'createProject.handler',
+      environment: {
+        PROJECTS_TABLE: props.projectTable.tableName
+      }
+    })
+
+    const getProjectsFn = new Function(this, `${id}-getProjects`, {
+      runtime: Runtime.NODEJS_18_X,
+      code: Code.fromAsset(join(this.MANAGEMENT_SERVICE_DIR, 'handlers/getProjects')),
+      handler: 'getProjects.handler',
+      environment: {
+        PROJECTS_TABLE: props.projectTable.tableName
+      }
     })
 
     props.projectTable.grantReadWriteData(createProjectFn);
 
-    const authorizer = new CognitoUserPoolsAuthorizer(this, `${id}-managementToolAuthorizer`, {
-      cognitoUserPools: [props.managementToolUserPool]
-    })
+    // const authorizer = new CognitoUserPoolsAuthorizer(this, `${id}-managementToolAuthorizer`, {
+    //   cognitoUserPools: [props.managementToolUserPool]
+    // })
 
-    const authProps = {authorizer, authorizationType: AuthorizationType.COGNITO}
+    // const authProps = {authorizer, authorizationType: AuthorizationType.COGNITO}
 
     const managementAPI = new RestApi(this, `${id}-managementAPI`);
 
-    const projectResource = managementAPI.root.addResource("project")
+    const projectResource = managementAPI.root.addResource("projects")
 
     projectResource.addCorsPreflight({
       allowMethods: ['POST', 'GET'],
@@ -48,7 +60,8 @@ export class ManagementServiceStack extends cdk.Stack {
       ],
    })
     
-    projectResource.addMethod('POST', new LambdaIntegration(createProjectFn))
-
+    projectResource.addMethod('POST', new LambdaIntegration(createProjectFn));
+    projectResource.addMethod('GET', new LambdaIntegration(getProjectsFn));
+    
   }
 }
