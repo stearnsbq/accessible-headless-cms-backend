@@ -1,5 +1,5 @@
 import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda';
-import { ListTablesCommand, DynamoDBClient, UpdateItemInput, PutItemInput, QueryInput } from "@aws-sdk/client-dynamodb";
+import { ListTablesCommand, DynamoDBClient, UpdateItemInput, PutItemInput, QueryInput, ScanInput } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocument, DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { NewProjectInput } from '../../model/NewProjectInput';
 
@@ -11,25 +11,11 @@ const PROJECTS_TABLE = process.env.PROJECTS_TABLE ?? '';
 export const handler = async (event: APIGatewayEvent, context: Context): Promise<APIGatewayProxyResult> => {
 
     try{
-
-        if(!event.pathParameters || !event.pathParameters['project']){
-            return {
-                statusCode: 400,
-                body: JSON.stringify({
-                    success: false, err: 'missing project'
-                }),
-            }
-        }
-        
-        const queryParams = {
+        const scanParams : ScanInput = {
             TableName: PROJECTS_TABLE,
-            KeyConditionExpression: 'project = :project',
-            ExpressionAttributeValues:{
-                ':project': event!.pathParameters!['project']
-            }
         }
 
-        const result = await getAllItems(queryParams);
+        const result = await getAllItems(scanParams);
 
         return {
             statusCode: 200,
@@ -49,12 +35,12 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
   
 };
 
-async function getAllItems(params: any){
+async function getAllItems(params: ScanInput){
     let accumulated: any[] = [];
     let LastEvaluatedKey;
     do{
 
-        const result = await db.query(params);
+        const result = await db.scan(params);
 
         LastEvaluatedKey = result.LastEvaluatedKey
         accumulated = [...accumulated, ...(result.Items ?? [])]
