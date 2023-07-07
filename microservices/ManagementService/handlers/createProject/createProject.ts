@@ -2,6 +2,7 @@ import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda';
 import { ListTablesCommand, DynamoDBClient, UpdateItemInput, PutItemInput } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocument, DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { NewProjectInput } from '../../model/NewProjectInput';
+import { randomUUID } from 'crypto';
 
 const client = new DynamoDBClient({});
 const db = DynamoDBDocument.from(client);
@@ -25,13 +26,14 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
 
 
 
-        const projectID: string = crypto.randomUUID();
+        const projectID: string = randomUUID();
 
         const putParams = {
             TableName: PROJECTS_TABLE,
             Item: {
                 'id': projectID,
                 'name': body.name,
+                'dateCreated': new Date().toISOString(),
                 'users': [],
             }
         }

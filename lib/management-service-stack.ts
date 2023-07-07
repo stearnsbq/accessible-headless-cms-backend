@@ -1,5 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
-import { AuthorizationType, Authorizer, CognitoUserPoolsAuthorizer, LambdaIntegration, Resource, RestApi } from 'aws-cdk-lib/aws-apigateway';
+import { AuthorizationType, Authorizer, CfnAuthorizer, CognitoUserPoolsAuthorizer, LambdaIntegration, MethodOptions, Resource, RestApi } from 'aws-cdk-lib/aws-apigateway';
 import { UserPool } from 'aws-cdk-lib/aws-cognito';
 import { Table } from 'aws-cdk-lib/aws-dynamodb';
 import { Function, Runtime, Code } from 'aws-cdk-lib/aws-lambda';
@@ -32,6 +32,8 @@ export class ManagementServiceStack extends cdk.Stack {
       }
     })
 
+    props.projectTable.grantReadWriteData(createProjectFn);
+
     const getProjectsFn = new Function(this, `${id}-getProjects`, {
       runtime: Runtime.NODEJS_18_X,
       code: Code.fromAsset(join(this.MANAGEMENT_SERVICE_DIR, 'handlers/getProjects')),
@@ -41,27 +43,35 @@ export class ManagementServiceStack extends cdk.Stack {
       }
     })
 
-    props.projectTable.grantReadWriteData(createProjectFn);
+    props.projectTable.grantReadWriteData(getProjectsFn);
 
-    // const authorizer = new CognitoUserPoolsAuthorizer(this, `${id}-managementToolAuthorizer`, {
-    //   cognitoUserPools: [props.managementToolUserPool]
-    // })
 
-    // const authProps = {authorizer, authorizationType: AuthorizationType.COGNITO}
+
+
+
+  
 
     const managementAPI = new RestApi(this, `${id}-managementAPI`);
+
+    const authorizer = new CfnAuthorizer(this, `${id}-managementToolAuthorizer`, {
+      restApiId: managementAPI.restApiId,
+      type: 'COGNITO_USER_POOLS', 
+      name: `${id}-managementToolAuthorizer`,
+      providerArns: [props.managementToolUserPool.userPoolArn], 
+      identitySource: 'method.request.header.Authorization',
+     });
+
+    const authProps: MethodOptions = {authorizer: {authorizerId: authorizer.ref}, authorizationType: AuthorizationType.COGNITO  }
 
     const projectResource = managementAPI.root.addResource("projects")
 
     projectResource.addCorsPreflight({
       allowMethods: ['POST', 'GET'],
-      allowOrigins: [
-        '*',
-      ],
+      allowOrigins: ['*'],
    })
     
-    projectResource.addMethod('POST', new LambdaIntegration(createProjectFn));
-    projectResource.addMethod('GET', new LambdaIntegration(getProjectsFn));
+    projectResource.addMethod('POST', new LambdaIntegration(createProjectFn), authProps);
+    projectResource.addMethod('GET', new LambdaIntegration(getProjectsFn), authProps);
     
   }
 }

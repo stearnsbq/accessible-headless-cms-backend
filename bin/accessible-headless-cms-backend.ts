@@ -4,7 +4,9 @@ import * as cdk from 'aws-cdk-lib';
 import { CommonStack } from '../lib/common-stack';
 import { ManagementServiceStack } from '../lib/management-service-stack';
 import { DeliveryServiceStack } from '../lib/delivery-service-stack';
+import { config } from 'dotenv';
 
+config()
 
 const app = new cdk.App();
 

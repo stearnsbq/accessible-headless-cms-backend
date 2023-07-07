@@ -1,5 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
-import { UserPool, UserPoolIdentityProviderGoogle } from 'aws-cdk-lib/aws-cognito';
+import { UserPool, UserPoolClientIdentityProvider, UserPoolIdentityProviderGoogle } from 'aws-cdk-lib/aws-cognito';
 import { AttributeType, Table } from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -86,6 +86,28 @@ export class CommonStack extends cdk.Stack {
 
   
      this.managementToolUserPool = new UserPool(this, `${id}-managementToolUserPool`);
+
+     const googleProvider = new UserPoolIdentityProviderGoogle(this, `${id}-managementToolGoogleProvider`, {
+  
+      userPool: this.managementToolUserPool,
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecretValue: cdk.SecretValue.unsafePlainText(process.env.GOOGLE_SECRET!)
+     });
+
+     const signInPath = "/auth/login"
+     const signOutPath = "/auth/logout"
+     const hosts = [
+       "http://localhost:4200",
+     ]
+
+     const client = this.managementToolUserPool.addClient("management-tool", {
+      supportedIdentityProviders: [UserPoolClientIdentityProvider.GOOGLE],
+      oAuth: {
+        callbackUrls: hosts.map((h) => h + signInPath),
+        logoutUrls: hosts.map((h) => h + signOutPath),
+      },
+     })
+
 
 
   }
